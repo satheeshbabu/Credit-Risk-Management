@@ -1,0 +1,69 @@
+from pyspark.sql.types import *
+struct=StructType([
+... StructField('Credibility',DoubleType(),True),
+... StructField('Account Balance',DoubleType(),True),
+... StructField('Credit Duration',DoubleType(),True),
+... StructField('History',DoubleType(),True),
+... StructField('Purpose',DoubleType(),True),
+... StructField('Credit Amount',DoubleType(),True),
+... StructField('Savings',DoubleType(),True),
+... StructField('Employment',DoubleType(),True),
+... StructField('InstallmentPercent',DoubleType(),True),
+... StructField('GenderandStatus',DoubleType(),True),
+... StructField('Guarantors',DoubleType(),True),
+... StructField('ResidenceTime',DoubleType(),True),
+... StructField('Assets',DoubleType(),True),
+... StructField('Age',DoubleType(),True),
+... StructField('ConcurrentCredit',DoubleType(),True),
+... StructField('Housing',DoubleType(),True),
+... StructField('Credit',DoubleType(),True),
+... StructField('Job',DoubleType(),True),
+... StructField('Dependents',DoubleType(),True),
+... StructField('Telephone',DoubleType(),True),
+... StructField('ForeignWorker',DoubleType(),True)])
+df = sqlContext.read.format("com.databricks.spark.csv").option("header","true").option("inferschema","true").load("./creditanalysis.csv",schema=struct)
+features=df.drop('Credibility')
+features.schema.names
+from pyspark.mllib.linalg import Vectors
+from pyspark.ml.feature import VectorAssembler
+assembler=VectorAssembler(inputCols=featurenames,outputCol="features")
+outputDF=assembler.transform(df)
+outputDF.select("features","Credibility").show()
+outputDF.show(5)
+from pyspark.ml.feature import StringIndexer
+#indexer= StringIndexer(inputCol='Credibility',outputCol='LabelIndex')
+indexer= StringIndexer(inputCol='Credibility',outputCol='label')
+indexed=indexer.fit(outputDF).transform(outputDF)
+indexed.show(5)
+trainData,testData=indexed.randomSplit([0.7,0.3],seed=7912)
+print("Training DataSet Count:"+str(trainData.count()))
+print("Testing DataSet Count:"+str(testData.count()))
+lr=LogisticRegression(featuresCol='features',labelCol='label',maxIter=100)
+lrModel=lr.fit(trainData)
+predictions=lrModel.transform(testData)
+evaluator=BinaryClassificationEvaluator()
+evaluator.getMetricName()
+print("ROC for Logistic Regression Model",evaluator.evaluate(predictions))
+from pyspark.ml.evaluation import MulticlassClassificationEvaluator
+evaluator=MulticlassClassificationEvaluator(labelCol="label",predictionCol="prediction",metricName="accuracy")
+print("Accuracy for Logistic Regression Model",evaluator.evaluate(predictions))
+from pyspark.ml.classification import RandomForestClassifier
+rf = RandomForestClassifier(labelCol="label", featuresCol="features")
+rfModel = rf.fit(trainData)
+rfpredictions = rfModel.transform(testData)
+evaluator=MulticlassClassificationEvaluator(labelCol="label",predictionCol="prediction",metricName="accuracy")
+print("Accuracy for Random Forest Model",evaluator.evaluate(rfpredictions))
+evaluator=BinaryClassificationEvaluator()
+print("ROC for Random Forest Model",evaluator.evaluate(rfpredictions))
+from pyspark.ml.classification import GBTClassifier
+gradientBoost = GBTClassifier(maxIter=100)
+gmodel=gradientBoost.fit(trainData)
+gpredictions = gmodel.transform(testData)  
+evaluator=MulticlassClassificationEvaluator(labelCol="label",predictionCol="prediction",metricName="accuracy")
+print("Accuracy for Gradient Boost Model",evaluator.evaluate(gpredictions))
+evaluator=BinaryClassificationEvaluator()
+print("ROC for Gradient Boost Model",evaluator.evaluate(gpredictions))
+
+
+
+
